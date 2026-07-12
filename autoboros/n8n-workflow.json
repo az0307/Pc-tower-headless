@@ -1,0 +1,62 @@
+{
+  "name": "Website Change -> Telegram + Trilium",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "changedetection-webhook",
+        "responseMode": "responseNode"
+      },
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $env.TELEGRAM_CHAT_ID }}",
+        "text": "=🌐 Website Changed!\n\nURL: {{ $json.body.url }}\nDiff: {{ $json.body.diff | truncate(500) }}"
+      },
+      "name": "Send Telegram",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.1,
+      "position": [450, 200]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.TRILIUM_URL }}/create-note",
+        "body": {
+          "title": "=Change: {{ $json.body.url }}",
+          "content": "=URL: {{ $json.body.url }}\n\n{{ $json.body.diff }}",
+          "parentNoteId": "root"
+        }
+      },
+      "name": "Create Trilium Note",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [450, 400]
+    },
+    {
+      "parameters": {},
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [650, 300]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [[
+        { "node": "Send Telegram", "type": "main", "index": 0 },
+        { "node": "Create Trilium Note", "type": "main", "index": 0 }
+      ]]
+    },
+    "Send Telegram": {
+      "main": [[{ "node": "Respond to Webhook", "type": "main", "index": 0 }]]
+    },
+    "Create Trilium Note": {
+      "main": [[{ "node": "Respond to Webhook", "type": "main", "index": 0 }]]
+    }
+  }
+}

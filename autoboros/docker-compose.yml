@@ -1,0 +1,98 @@
+version: "3.9"
+
+# ═══════════════════════════════════════════════════════════════
+#  AUTOBOROS TIER 0 — Core Infrastructure
+#  Budget: ~512MB RAM total
+#  These are the ONLY services that start by default.
+#  Everything else is in apps/ and deployed on demand.
+# ═══════════════════════════════════════════════════════════════
+
+services:
+  # === GATEWAY (64MB, Alpine) =================================
+  caddy:
+    image: caddy:2.8.4-alpine
+    restart: unless-stopped
+    mem_limit: 64m
+    cpus: 0.25
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./caddy/.env:/etc/caddy/.env:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks: [proxy]
+    env_file:
+      - ./caddy/.env
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:80"]
+      interval: 60s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # === MONITORING HUB (48MB, Go binary) =======================
+  beszel-hub:
+    image: henrygd/beszel:0.18.7
+    restart: unless-stopped
+    mem_limit: 48m
+    cpus: 0.2
+    ports:
+      - "8090:8090"
+    volumes:
+      - beszel_data:/beszel-data
+    networks: [proxy]
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8090"]
+      interval: 60s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # === MONITORING (80MB) ======================================
+  uptime-kuma:
+    image: louislam/uptime-kuma:1.23.16
+    restart: unless-stopped
+    mem_limit: 80m
+    cpus: 0.2
+    volumes:
+      - uptime_data:/app/data
+    networks: [proxy]
+    healthcheck:
+      test: ["CMD", "node", "extra/healthcheck.js"]
+      interval: 60s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  # === AUTO-UPDATES (32MB) ====================================
+  watchtower:
+    image: containrrr/watchtower:1.7.1
+    restart: unless-stopped
+    mem_limit: 32m
+    cpus: 0.1
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      WATCHTOWER_CLEANUP: "true"
+      WATCHTOWER_SCHEDULE: "0 4 * * *"
+      WATCHTOWER_INCLUDE_STOPPED: "true"
+      WATCHTOWER_REVIVE_STOPPED: "false"
+      WATCHTOWER_NOTIFICATIONS: "shoutrrr"
+      WATCHTOWER_NOTIFICATION_URL: "${WATCHTOWER_NOTIFY_URL:-}"
+      WATCHTOWER_POLL_INTERVAL: "3600"
+      WATCHTOWER_LABEL_ENABLE: "true"
+    networks: [proxy]
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+
+volumes:
+  caddy_data:
+  caddy_config:
+  beszel_data:
+  uptime_data:
+
+networks:
+  proxy:
+    driver: bridge

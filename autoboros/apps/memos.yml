@@ -1,0 +1,22 @@
+version: "3.9"
+# Memos Quick Notes — Tier 1
+# RAM: 64MB | CPU: 0.2
+# Single Go binary, SQLite default, ~20MB image
+services:
+  memos:
+    image: neosmemo/memos:0.28.0
+    restart: unless-stopped
+    mem_limit: 64m
+    cpus: 0.2
+    volumes:
+      - memos_data:/var/opt/memos
+    networks: [proxy]
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+
+volumes:
+  memos_data:
+
+networks:
+  proxy:
+    external: true

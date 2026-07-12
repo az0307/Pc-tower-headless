@@ -1,0 +1,88 @@
+---
+# Deploy AUTOBOROS Tier 3 apps to worker laptops
+# Usage: ansible-playbook -i inventory.ini site.yml --ask-become-pass
+
+- name: AUTOBOROS Worker Setup
+  hosts: workers
+  become: yes
+  vars:
+    docker_dir: "{{ ansible_env.HOME }}/docker"
+    apps_dir: "{{ ansible_env.HOME }}/apps"
+
+  tasks:
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+
+    - name: Install Docker
+      apt:
+        name:
+          - docker.io
+          - docker-compose-v2
+          - curl
+          - git
+          - htop
+          - jq
+        state: present
+
+    - name: Ensure docker running
+      systemd:
+        name: docker
+        state: started
+        enabled: yes
+
+    - name: Add user to docker group
+      user:
+        name: "{{ ansible_env.USER }}"
+        groups: docker
+        append: yes
+
+    - name: Create directories
+      file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+      loop:
+        - "{{ docker_dir }}"
+        - "{{ apps_dir }}"
+
+    - name: Copy Tier 3 app compose files
+      copy:
+        src: "../apps/{{ item }}"
+        dest: "{{ apps_dir }}/{{ item }}"
+        mode: '0644'
+      loop:
+        - n8n.yml
+        - trilium.yml
+        - activepieces.yml
+        - docmost.yml
+        - changedetection.yml
+        - stirling-pdf.yml
+
+    - name: Copy worker env template
+      copy:
+        src: "../worker.env"
+        dest: "{{ apps_dir }}/.env"
+        mode: '0600'
+
+    - name: Start all Tier 3 services
+      command: docker compose -f "{{ apps_dir }}/{{ item }}" up -d
+      args:
+        chdir: "{{ apps_dir }}"
+      loop:
+        - n8n.yml
+        - trilium.yml
+        - activepieces.yml
+        - docmost.yml
+        - changedetection.yml
+        - stirling-pdf.yml
+
+    - name: Verify containers
+      command: docker ps --format "{% raw %}{{.Names}}{% endraw %}"
+      register: docker_ps
+      changed_when: false
+
+    - name: Show running
+      debug:
+        msg: "Running: {{ docker_ps.stdout_lines | join(', ') }}"

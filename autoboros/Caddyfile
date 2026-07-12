@@ -1,0 +1,119 @@
+# ═══════════════════════════════════════════════════════════════
+#  AUTOBOROS Caddyfile v3.0
+#  All routes for core + optional apps
+# ═══════════════════════════════════════════════════════════════
+
+:80 {
+    respond "AUTOBOROS Gateway — Unauthorized"
+}
+
+# --- Tier 0: Core ---
+beszel.{$TAILSCALE_DOMAIN} {
+    reverse_proxy beszel-hub:8090
+    header {
+        X-Frame-Options "SAMEORIGIN"
+        X-Content-Type-Options "nosniff"
+        X-Robots-Tag "noindex, nofollow"
+    }
+}
+
+uptime.{$TAILSCALE_DOMAIN} {
+    reverse_proxy uptime-kuma:3001
+    header {
+        X-Frame-Options "SAMEORIGIN"
+        X-Content-Type-Options "nosniff"
+    }
+}
+
+# --- Tier 1: Essential Apps ---
+homarr.{$TAILSCALE_DOMAIN} {
+    reverse_proxy homarr:7575
+    header {
+        X-Frame-Options "SAMEORIGIN"
+        X-Content-Type-Options "nosniff"
+        X-Robots-Tag "noindex, nofollow"
+    }
+}
+
+dockge.{$TAILSCALE_DOMAIN} {
+    reverse_proxy dockge:5001
+    header {
+        X-Frame-Options "SAMEORIGIN"
+        X-Content-Type-Options "nosniff"
+    }
+}
+
+vaultwarden.{$TAILSCALE_DOMAIN} {
+    reverse_proxy vaultwarden:80
+    header {
+        X-Frame-Options "DENY"
+        X-Content-Type-Options "nosniff"
+        Referrer-Policy "no-referrer"
+    }
+}
+
+memos.{$TAILSCALE_DOMAIN} {
+    reverse_proxy memos:5230
+    header {
+        X-Frame-Options "SAMEORIGIN"
+        X-Content-Type-Options "nosniff"
+    }
+}
+
+pocket-id.{$TAILSCALE_DOMAIN} {
+    reverse_proxy pocket-id:3000
+    header {
+        X-Frame-Options "SAMEORIGIN"
+        X-Content-Type-Options "nosniff"
+    }
+}
+
+# --- Tier 2: Power Apps ---
+plausible.{$TAILSCALE_DOMAIN} {
+    reverse_proxy plausible:8000
+    header {
+        X-Frame-Options "SAMEORIGIN"
+        X-Content-Type-Options "nosniff"
+    }
+}
+
+nocodb.{$TAILSCALE_DOMAIN} {
+    reverse_proxy nocodb:8080
+    header {
+        X-Frame-Options "SAMEORIGIN"
+        X-Content-Type-Options "nosniff"
+    }
+}
+
+karakeep.{$TAILSCALE_DOMAIN} {
+    reverse_proxy karakeep:3000
+    header {
+        X-Frame-Options "SAMEORIGIN"
+        X-Content-Type-Options "nosniff"
+    }
+}
+
+excalidraw.{$TAILSCALE_DOMAIN} {
+    reverse_proxy excalidraw:80
+    header {
+        X-Frame-Options "SAMEORIGIN"
+        X-Content-Type-Options "nosniff"
+    }
+}
+
+# --- Tier 3: Worker Routes (proxy to workers) ---
+n8n.{$TAILSCALE_DOMAIN} {
+    reverse_proxy {$N8N_WORKER_IP:127.0.0.1}:5678
+}
+
+trilium.{$TAILSCALE_DOMAIN} {
+    reverse_proxy {$TRILIUM_WORKER_IP:127.0.0.1}:8080
+}
+
+activepieces.{$TAILSCALE_DOMAIN} {
+    reverse_proxy {$ACTIVEPIECES_WORKER_IP:127.0.0.1}:8080
+}
+
+docmost.{$TAILSCALE_DOMAIN} {
+    reverse_proxy {$DOCMOST_WORKER_IP:127.0.0.1}:3000
+}

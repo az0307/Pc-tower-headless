@@ -1,0 +1,49 @@
+version: "3.9"
+# Karakeep Bookmark Archiver — Tier 2
+# RAM: 256MB | CPU: 0.3
+# AI-tagged bookmarks, replaces Hoarder
+services:
+  karakeep:
+    image: ghcr.io/karakeep-app/karakeep:0.24.1
+    restart: unless-stopped
+    mem_limit: 256m
+    cpus: 0.3
+    environment:
+      MEILI_ADDR: "http://karakeep-meilisearch:7700"
+      BROWSER_WEB_URL: "http://karakeep-chrome:9222"
+      DATA_DIR: "/data"
+      NEXTAUTH_SECRET: "${KARAKEEP_SECRET:-change-me}"
+    volumes:
+      - karakeep_data:/data
+    networks: [proxy, karakeep-internal]
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+
+  karakeep-meilisearch:
+    image: getmeili/meilisearch:v1.14.0
+    restart: unless-stopped
+    mem_limit: 128m
+    cpus: 0.2
+    environment:
+      MEILI_NO_ANALYTICS: "true"
+    volumes:
+      - karakeep_meili:/meili_data
+    networks: [karakeep-internal]
+
+  karakeep-chrome:
+    image: gcr.io/zenika-hub/alpine-chrome:124
+    restart: unless-stopped
+    mem_limit: 128m
+    cpus: 0.2
+    command: ["--no-sandbox", "--disable-gpu", "--disable-dev-shm-usage"]
+    networks: [karakeep-internal]
+
+volumes:
+  karakeep_data:
+  karakeep_meili:
+
+networks:
+  proxy:
+    external: true
+  karakeep-internal:
+    driver: bridge

@@ -1,0 +1,10 @@
+docker/caddy/data
+docker/caddy/config
+docker/homarr/data
+docker/*/data
+cache
+tmp
+*.log
+logs/
+.git
+node_modules

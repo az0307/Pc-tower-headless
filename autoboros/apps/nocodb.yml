@@ -1,0 +1,22 @@
+version: "3.9"
+# NocoDB Spreadsheet Database — Tier 2
+# RAM: 256MB | CPU: 0.3
+# Airtable alternative, SQLite default, zero config
+services:
+  nocodb:
+    image: nocodb/nocodb:0.262.1
+    restart: unless-stopped
+    mem_limit: 256m
+    cpus: 0.3
+    environment:
+      NC_DB: "sqlite3://~/docker/nocodb/data/noco.db"
+      NC_PUBLIC_URL: "https://nocodb.${TAILSCALE_DOMAIN}"
+    volumes:
+      - ~/docker/nocodb/data:/usr/src/appEntry/data
+    networks: [proxy]
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+
+networks:
+  proxy:
+    external: true

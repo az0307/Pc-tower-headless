@@ -1,0 +1,32 @@
+version: "3.9"
+# n8n Automation — Tier 3 (Worker Only)
+# RAM: 512MB | CPU: 1.0
+# Deploy on laptop/worker, NOT on tower
+services:
+  n8n:
+    image: n8nio/n8n:1.82.0
+    restart: unless-stopped
+    mem_limit: 512m
+    cpus: 1.0
+    environment:
+      N8N_BASIC_AUTH_ACTIVE: "true"
+      N8N_BASIC_AUTH_USER: "${N8N_USER:-admin}"
+      N8N_BASIC_AUTH_PASSWORD: "${N8N_PASSWORD:-changeme}"
+      N8N_HOST: "n8n.${TAILSCALE_DOMAIN}"
+      N8N_PORT: "5678"
+      WEBHOOK_URL: "https://n8n.${TAILSCALE_DOMAIN}"
+      GENERIC_TIMEZONE: "${TZ:-UTC}"
+      EXECUTIONS_MODE: "regular"
+      DB_TYPE: "sqlite"
+    volumes:
+      - n8n_data:/home/node/.n8n
+    ports:
+      - "5678:5678"
+    networks: [worker]
+
+volumes:
+  n8n_data:
+
+networks:
+  worker:
+    driver: bridge

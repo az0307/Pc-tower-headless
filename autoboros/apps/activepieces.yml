@@ -1,0 +1,28 @@
+version: "3.9"
+# Activepieces Automation — Tier 3 (Worker Only)
+# RAM: 512MB | CPU: 1.0
+# Zapier alternative, 150+ integrations, MIT license
+services:
+  activepieces:
+    image: activepieces/activepieces:0.50.0
+    restart: unless-stopped
+    mem_limit: 512m
+    cpus: 1.0
+    environment:
+      AP_API_KEY: "${ACTIVEPIECES_API_KEY:-change-me}"
+      AP_FRONTEND_URL: "https://activepieces.${TAILSCALE_DOMAIN}"
+      AP_ENVIRONMENT: "prod"
+      AP_EXECUTION_MODE: "UNSANDBOXED"
+      AP_DB_TYPE: "SQLITE3"
+    volumes:
+      - activepieces_data:/usr/src/app/packages/server/api/.assets
+    ports:
+      - "8080:80"
+    networks: [worker]
+
+volumes:
+  activepieces_data:
+
+networks:
+  worker:
+    driver: bridge

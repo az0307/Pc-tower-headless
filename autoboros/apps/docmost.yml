@@ -1,0 +1,56 @@
+version: "3.9"
+# Docmost Wiki — Tier 3 (Worker Only)
+# RAM: 512MB | CPU: 0.5
+# Confluence alternative, collaborative editing, CRDT sync
+services:
+  docmost:
+    image: docmost/docmost:0.9.0
+    restart: unless-stopped
+    mem_limit: 512m
+    cpus: 0.5
+    environment:
+      APP_URL: "https://docmost.${TAILSCALE_DOMAIN}"
+      APP_SECRET: "${DOCMOST_SECRET:-change-me-in-env}"
+      DATABASE_URL: "postgresql://docmost:docmost@docmost-db:5432/docmost"
+      REDIS_URL: "redis://docmost-redis:6379"
+    depends_on:
+      - docmost-db
+      - docmost-redis
+    volumes:
+      - docmost_data:/app/data/storage
+    ports:
+      - "3000:3000"
+    networks: [worker, docmost-internal]
+
+  docmost-db:
+    image: postgres:16.4-alpine
+    restart: unless-stopped
+    mem_limit: 128m
+    cpus: 0.2
+    environment:
+      POSTGRES_USER: "docmost"
+      POSTGRES_PASSWORD: "docmost"
+      POSTGRES_DB: "docmost"
+    volumes:
+      - docmost_postgres:/var/lib/postgresql/data
+    networks: [docmost-internal]
+
+  docmost-redis:
+    image: redis:7.4-alpine
+    restart: unless-stopped
+    mem_limit: 64m
+    cpus: 0.1
+    volumes:
+      - docmost_redis:/data
+    networks: [docmost-internal]
+
+volumes:
+  docmost_data:
+  docmost_postgres:
+  docmost_redis:
+
+networks:
+  worker:
+    driver: bridge
+  docmost-internal:
+    driver: bridge

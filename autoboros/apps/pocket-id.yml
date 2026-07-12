@@ -1,0 +1,25 @@
+version: "3.9"
+# Pocket ID Passkey Auth — Tier 1
+# RAM: 128MB | CPU: 0.2
+# OIDC provider, passwordless, Go backend
+services:
+  pocket-id:
+    image: ghcr.io/pocket-id/pocket-id:2.7.0
+    restart: unless-stopped
+    mem_limit: 128m
+    cpus: 0.2
+    environment:
+      PUBLIC_APP_URL: "https://pocket-id.${TAILSCALE_DOMAIN}"
+      TRUST_PROXY: "true"
+    volumes:
+      - pocket_id_data:/app/backend/data
+    networks: [proxy]
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+
+volumes:
+  pocket_id_data:
+
+networks:
+  proxy:
+    external: true

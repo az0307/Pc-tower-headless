@@ -1,0 +1,53 @@
+version: "3.9"
+# Plausible Analytics — Tier 2
+# RAM: 512MB | CPU: 0.5
+# GDPR-compliant, cookie-free, replaces Google Analytics
+services:
+  plausible:
+    image: plausible/analytics:v2.1.5
+    restart: unless-stopped
+    mem_limit: 512m
+    cpus: 0.5
+    ports:
+      - "8000:8000"
+    environment:
+      BASE_URL: "https://plausible.${TAILSCALE_DOMAIN}"
+      SECRET_KEY_BASE: "${PLAUSIBLE_SECRET_KEY_BASE:-change-me-in-env}"
+      DATABASE_URL: "postgres://postgres:postgres@plausible-db:5432/plausible"
+      CLICKHOUSE_DATABASE_URL: "http://plausible-clickhouse:8123/plausible"
+    depends_on:
+      - plausible-db
+      - plausible-clickhouse
+    networks: [proxy, plausible-internal]
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+
+  plausible-db:
+    image: postgres:16.4-alpine
+    restart: unless-stopped
+    mem_limit: 128m
+    cpus: 0.2
+    volumes:
+      - plausible_postgres:/var/lib/postgresql/data
+    environment:
+      POSTGRES_PASSWORD: "postgres"
+    networks: [plausible-internal]
+
+  plausible-clickhouse:
+    image: clickhouse/clickhouse-server:24.8-alpine
+    restart: unless-stopped
+    mem_limit: 256m
+    cpus: 0.3
+    volumes:
+      - plausible_clickhouse:/var/lib/clickhouse
+    networks: [plausible-internal]
+
+volumes:
+  plausible_postgres:
+  plausible_clickhouse:
+
+networks:
+  proxy:
+    external: true
+  plausible-internal:
+    driver: bridge

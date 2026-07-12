@@ -1,0 +1,23 @@
+version: "3.9"
+# Trilium Notes — Tier 3 (Worker Only)
+# RAM: 512MB | CPU: 1.0
+services:
+  trilium:
+    image: zadam/trilium:0.63.7
+    restart: unless-stopped
+    mem_limit: 512m
+    cpus: 1.0
+    environment:
+      TRILIUM_DATA_DIR: /home/node/trilium-data
+    volumes:
+      - trilium_data:/home/node/trilium-data
+    ports:
+      - "8080:8080"
+    networks: [worker]
+
+volumes:
+  trilium_data:
+
+networks:
+  worker:
+    driver: bridge

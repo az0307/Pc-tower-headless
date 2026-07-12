@@ -1,0 +1,20 @@
+# Secrets / environment
+.env
+*.env.local
+*.key
+*.pem
+id_ed25519*
+id_rsa*
+
+# Backups / archives
+*.bak
+*.bak.*
+backups/
+*.tar.gz
+*.zip
+
+# OS / editor cruft
+.DS_Store
+Thumbs.db
+*.swp
+*~

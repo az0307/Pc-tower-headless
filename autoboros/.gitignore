@@ -1,0 +1,26 @@
+# Secrets
+*.env
+!.env.example
+*.key
+*.pem
+*.crt
+backups/restic/
+backups/.restic-pass
+
+# Runtime
+docker/caddy/data/
+docker/caddy/config/
+docker/homarr/data/
+docker/dockge/data/
+docker/*/data/
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
