@@ -1,5 +1,27 @@
 # Changelog
 
+## The `srv` command — one short command for everything
+
+A daily-driver CLI/TUI front door to the whole toolkit, designed to be easy to type
+*and* easy to voice-dictate (Wispr Flow-friendly), covering the tower today and VPS
+hosts later.
+
+### Added
+
+- `bin/srv` — the command. Dashboard widget (`srv status`), health checks, updates,
+  TUI widget launcher (btop/duf/dust/lazydocker/lnav/yazi), autoboros app-stack
+  actions, Tailscale, backups, logs, and saved-host SSH (`srv tower`, `srv vps1`).
+  Best-practice interaction layer:
+  - **fuzzy search** in every picker (gum filter → fzf → plain fallback)
+  - **typo correction** — unambiguous close matches prompt "Did you mean…"
+  - **memory** — 3 most-used actions float to the top of the menu (★)
+  - **single-letter shortcuts** (`s` `h` `u` `m` `w` `c` `a` `t` `b` `l`)
+  - **dictation-friendly** — case-insensitive, prefix/synonym matching, extra words ignored
+- `completions/srv.bash` — shell tab completion (commands + saved host names).
+- `scripts/install-srv.sh` — installs `srv`, a `tower` alias, and the completion;
+  offers gum (Charm apt repo) for pretty menus.
+- `docs/09-srv-command.md` — reference.
+
 ## Stage 0 remote-access bootstrap + lockout guard
 
 Adds a gentle "go headless first" onboarding path so you can set up remote SSH at

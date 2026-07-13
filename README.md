@@ -33,6 +33,7 @@ Think of the repo as three layers you can adopt independently:
 | **1. Base OS + hardening** | One script + guides to install and secure a headless Debian server (SSH key-only, UFW, Fail2ban, unattended-upgrades, optional Docker/QoL/AI tooling). Works on any server — VPS, VM, bare metal, or an old tower. | `scripts/`, `docs/01`–`docs/06` |
 | **2. The physical tower + remote access** | Repurposing a Vista-era desktop, plus Tailscale for reaching it from anywhere without opening ports. | `docs/07`, `docs/08` |
 | **3. Self-hosted apps** | An optional, resource-tiered Docker app stack for the tower. Deploy only the tiers your RAM allows. | `autoboros/` |
+| **4. The `srv` command** | One short command that wraps all of the above: fuzzy TUI menu, dashboard, health, updates, widgets, and `srv tower` / `srv vps1` to hop between machines. Typo-corrected, tab-completed, dictation-friendly. | `bin/srv`, `docs/09` |
 
 You can stop after Layer 1 for a plain hardened server, or go all the way to a
 self-hosted homelab on 15-year-old hardware.
@@ -106,6 +107,19 @@ per-app RAM budgets.
 
 ---
 
+### The `srv` command — daily driver
+
+```bash
+sudo bash scripts/install-srv.sh   # installs srv (+ `tower` alias) and tab completion
+srv                                # dashboard + fuzzy menu
+srv hosts                          # save tower + future VPSes, then: srv tower / srv vps1
+```
+
+Fuzzy search, single-letter shortcuts, "did you mean" typo correction, usage memory,
+and tab completion — see [`docs/09-srv-command.md`](docs/09-srv-command.md).
+
+---
+
 ## Repository Layout
 
 ```
@@ -113,9 +127,14 @@ debian12-headless-server/
 ├── README.md                          # you are here
 ├── CHANGELOG.md                       # what was consolidated, and why
 ├── LICENSE                            # MIT
+├── bin/
+│   └── srv                            # the daily-driver command (fuzzy TUI, memory, shortcuts)
+├── completions/
+│   └── srv.bash                       # tab completion for srv (bash/zsh)
 ├── scripts/
 │   ├── 00-enable-remote-access.sh     # Stage 0: enable + verify password SSH so you can go headless
-│   └── debian-server-postinstall.sh   # canonical base hardening + QoL script (Bookworm/Trixie)
+│   ├── debian-server-postinstall.sh   # canonical base hardening + QoL script (Bookworm/Trixie)
+│   └── install-srv.sh                 # installs srv + tower alias + completion
 ├── docs/
 │   ├── 00-remote-access-bootstrap.md  # go-headless-first workflow (Stage 0)
 │   ├── 01-installation-guide.md       # minimal headless install + hardening walkthrough
@@ -125,7 +144,8 @@ debian12-headless-server/
 │   ├── 05-upgrade-bookworm-to-trixie.md
 │   ├── 06-legacy-hardware-checklist.md # Vista-era / low-RAM specifics
 │   ├── 07-tower-fresh-install.md      # repurposing an old desktop tower
-│   └── 08-tailscale-remote-access.md  # secure remote access, no port-forwarding
+│   ├── 08-tailscale-remote-access.md  # secure remote access, no port-forwarding
+│   └── 09-srv-command.md              # the srv command reference
 └── autoboros/                         # optional tier-based self-hosting stack (see its own README)
 ```
 

@@ -1,0 +1,424 @@
+#!/bin/bash
+#
+# srv — one short command for your headless server(s)
+#
+# USAGE
+#   srv                  interactive menu (dashboard + recent-first actions)
+#   srv <command>        run an action directly (fuzzy + typo-corrected)
+#   srv <host>           ssh straight to a saved host:  srv tower / srv vps1
+#
+# COMMANDS            SHORTCUT
+#   status               s     system dashboard widget
+#   health               h     run health checks
+#   update               u     apt update/upgrade (+ app updates)
+#   monitor              m     open btop/htop
+#   widgets              w     open-source TUI widgets (btop, duf, dust, ...)
+#   connect [host]       c     ssh into a saved host (fuzzy-picked)
+#   apps                 a     autoboros app stack (install/deploy/health)
+#   tailscale            t     vpn status / bring up
+#   backup               b     run a backup now
+#   logs                 l     follow system logs
+#   tools                      install the open-source QoL toolkit
+#   stage0                     enable remote SSH access (go-headless bootstrap)
+#   harden                     run the post-install hardening script
+#   hosts                      manage saved hosts
+#   help                       this help
+#
+# QoL: fuzzy matching, "did you mean" typo correction, per-command memory
+# (recent actions float to the top of the menu), tab completion (see
+# completions/srv.bash), and dictation-friendly synonyms — extra words are
+# ignored, so "srv health check please" works.
+#
+# Config:  ~/.config/srv/config    (repo path)
+#          ~/.config/srv/hosts     (saved hosts: name  user@address)
+#          ~/.config/srv/history   (usage memory)
+
+set -uo pipefail
+
+CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/srv"
+CONFIG_FILE="$CONFIG_DIR/config"
+HOSTS_FILE="$CONFIG_DIR/hosts"
+HIST_FILE="$CONFIG_DIR/history"
+mkdir -p "$CONFIG_DIR"
+
+# ------------------------------------------------------------------ registry
+# name|shortcut|synonyms (comma-sep prefixes)|description
+COMMANDS=(
+    "status|s|stat,dash,over,info|system dashboard widget"
+    "health|h|heal,chec|run health checks"
+    "update|u|upd,upgr|update system + apps"
+    "monitor|m|mon,top,btop|open btop/htop"
+    "widgets|w|wid,tui|open a TUI widget"
+    "connect|c|conn,ssh,go|ssh to a saved host"
+    "apps|a|app,stack,autob|autoboros app stack"
+    "tailscale|t|tail,ts,vpn|vpn status / bring up"
+    "backup|b|back|run a backup now"
+    "logs|l|log,journ|follow system logs"
+    "tools||tool,qol,install|install QoL toolkit"
+    "stage0||stage,remote,acce,boot|enable remote access"
+    "harden||hard,secur,lock|run hardening script"
+    "hosts||host,mach|manage saved hosts"
+    "help||-h,--help|show help"
+)
+
+# ------------------------------------------------------------------ ui
+HAS_GUM=false; command -v gum &>/dev/null && HAS_GUM=true
+HAS_FZF=false; command -v fzf &>/dev/null && HAS_FZF=true
+
+C_RESET=$'\033[0m'; C_BOLD=$'\033[1m'; C_DIM=$'\033[2m'
+C_GREEN=$'\033[32m'; C_YELLOW=$'\033[33m'; C_RED=$'\033[31m'; C_CYAN=$'\033[36m'
+
+say()  { echo "${C_CYAN}${C_BOLD}$*${C_RESET}"; }
+ok()   { echo "  ${C_GREEN}✔${C_RESET} $*"; }
+warn() { echo "  ${C_YELLOW}●${C_RESET} $*"; }
+bad()  { echo "  ${C_RED}✘${C_RESET} $*"; }
+
+# pick "Prompt" opt1 opt2 ...  → fuzzy-searchable picker ("buttons")
+pick() {
+    local prompt="$1"; shift
+    (($#)) || return 1
+    if $HAS_GUM; then
+        printf '%s\n' "$@" | gum filter --placeholder "type to filter…" --header "$prompt" --height 14
+    elif $HAS_FZF; then
+        printf '%s\n' "$@" | fzf --prompt "$prompt " --height=~40% --reverse
+    else
+        echo "${C_BOLD}$prompt${C_RESET}" >&2
+        local opt; select opt in "$@"; do [[ -n "${opt:-}" ]] && { echo "$opt"; return; }; done
+    fi
+}
+
+confirm() {
+    local prompt="${1:-Are you sure?}"
+    if $HAS_GUM; then gum confirm "$prompt"; else
+        read -r -p "$prompt [y/N] " r; [[ "$r" =~ ^[Yy] ]]
+    fi
+}
+
+input() {
+    local prompt="$1" placeholder="${2:-}"
+    if $HAS_GUM; then gum input --prompt "$prompt " --placeholder "$placeholder"; else
+        read -r -p "$prompt " r; echo "$r"
+    fi
+}
+
+# ------------------------------------------------------------------ memory
+remember() { echo "$1 $(date +%s)" >> "$HIST_FILE"; }
+
+# top N most-used commands, most-recent breaking ties
+recent_cmds() {
+    local n="${1:-3}"
+    [[ -f "$HIST_FILE" ]] || return 0
+    tail -200 "$HIST_FILE" | awk '{c[$1]++; t[$1]=NR} END{for (k in c) print c[k], t[k], k}' \
+        | sort -rn | awk -v n="$n" 'NR<=n{print $3}'
+}
+
+# ------------------------------------------------------------------ matching
+# levenshtein a b  (small strings only)
+lev() {
+    local a="$1" b="$2" i j cost
+    local la=${#a} lb=${#b}
+    local -a prev curr
+    for ((j=0; j<=lb; j++)); do prev[j]=$j; done
+    for ((i=1; i<=la; i++)); do
+        curr[0]=$i
+        for ((j=1; j<=lb; j++)); do
+            [[ "${a:i-1:1}" == "${b:j-1:1}" ]] && cost=0 || cost=1
+            local d=$((prev[j]+1)) ins=$((curr[j-1]+1)) sub=$((prev[j-1]+cost))
+            local m=$d; ((ins<m)) && m=$ins; ((sub<m)) && m=$sub
+            curr[j]=$m
+        done
+        prev=("${curr[@]}")
+    done
+    echo "${prev[lb]}"
+}
+
+# resolve raw word → canonical command name (or empty)
+resolve() {
+    local w; w="$(echo "$1" | tr '[:upper:]' '[:lower:]')"
+    local entry name short syns
+    # 1) exact name or shortcut
+    for entry in "${COMMANDS[@]}"; do
+        IFS='|' read -r name short syns _ <<< "$entry"
+        [[ "$w" == "$name" || ( -n "$short" && "$w" == "$short" ) ]] && { echo "$name"; return; }
+    done
+    # 2) synonym / prefix match
+    for entry in "${COMMANDS[@]}"; do
+        IFS='|' read -r name short syns _ <<< "$entry"
+        [[ "$name" == "$w"* ]] && { echo "$name"; return; }
+        local s; for s in ${syns//,/ }; do
+            [[ "$w" == "$s"* || "$s" == "$w"* ]] && { echo "$name"; return; }
+        done
+    done
+    # 3) saved host name → connect
+    if hosts_list | awk '{print tolower($1)}' | grep -q "^$w"; then
+        echo "__host__"; return
+    fi
+    # 4) typo correction: closest command within distance 2, if unambiguous
+    local best="" bestd=3 tie=false d
+    for entry in "${COMMANDS[@]}"; do
+        IFS='|' read -r name _ _ _ <<< "$entry"
+        d="$(lev "$w" "$name")"
+        if ((d < bestd)); then best="$name"; bestd=$d; tie=false
+        elif ((d == bestd)) && [[ -n "$best" && "$name" != "$best" ]]; then tie=true; fi
+    done
+    if [[ -n "$best" && "$tie" == "false" ]]; then echo "__suggest__:$best"; return; fi
+    echo ""
+}
+
+# ------------------------------------------------------------------ repo lookup
+find_repo() {
+    if [[ -f "$CONFIG_FILE" ]]; then
+        # shellcheck disable=SC1090
+        source "$CONFIG_FILE"
+        [[ -n "${SRV_REPO:-}" && -d "$SRV_REPO/scripts" ]] && { echo "$SRV_REPO"; return; }
+    fi
+    local c
+    for c in \
+        "${SRV_REPO:-}" \
+        "$HOME/meta-automation-hub/debian12-headless-server" \
+        "$HOME/debian12-headless-server" \
+        "$(dirname "$(dirname "$(readlink -f "$0")")")"; do
+        [[ -n "$c" && -f "$c/scripts/debian-server-postinstall.sh" ]] && {
+            echo "SRV_REPO=\"$c\"" > "$CONFIG_FILE"; echo "$c"; return; }
+    done
+    return 1
+}
+REPO="$(find_repo || true)"
+
+need_repo() {
+    [[ -n "$REPO" ]] && return 0
+    bad "Toolkit repo not found. Clone it, then re-run:"
+    echo "    git clone https://github.com/az0307/meta-automation-hub.git"
+    echo "    export SRV_REPO=~/meta-automation-hub/debian12-headless-server"
+    return 1
+}
+
+# ------------------------------------------------------------------ dashboard
+kv() { printf "  ${C_DIM}%-11s${C_RESET} %s\n" "$1" "$2"; }
+
+svc_state() {
+    if systemctl is-active --quiet "$1" 2>/dev/null; then ok "$2 active"
+    elif systemctl list-unit-files "$1.service" 2>/dev/null | grep -q "$1"; then warn "$2 installed, not active"
+    else warn "$2 not installed"; fi
+}
+
+cmd_status() {
+    say "── $(hostname) ─ $(date '+%a %d %b %H:%M') ──"
+    kv "OS"      "$(. /etc/os-release 2>/dev/null; echo "${PRETTY_NAME:-unknown}") · $(uname -r)"
+    kv "Uptime"  "$(uptime -p 2>/dev/null | sed 's/^up //') · load$(uptime | sed 's/.*load average//')"
+    kv "Memory"  "$(free -h | awk '/^Mem:/{print $3" / "$2" used"}')$(free -h | awk '/^Swap:/{if ($2!="0B") print "  ·  swap "$3" / "$2}')"
+    kv "Disk /"  "$(df -h / | awk 'NR==2{print $3" / "$2" ("$5")"}')"
+    kv "LAN IP"  "$(hostname -I 2>/dev/null | awk '{print $1}')"
+    if command -v tailscale &>/dev/null; then
+        local ts_ip; ts_ip="$(tailscale ip -4 2>/dev/null | head -1)"
+        [[ -n "$ts_ip" ]] && kv "Tailscale" "$ts_ip" || kv "Tailscale" "installed, not up (srv tailscale)"
+    fi
+    command -v docker &>/dev/null && kv "Docker" "$(docker ps -q 2>/dev/null | wc -l) container(s) running"
+    echo
+    svc_state ssh      "SSH"
+    svc_state fail2ban "fail2ban"
+    command -v ufw &>/dev/null && { ufw status 2>/dev/null | grep -q active && ok "UFW active" || warn "UFW inactive"; }
+}
+
+# ------------------------------------------------------------------ actions
+cmd_health() {
+    if [[ -n "$REPO" && -f "$REPO/autoboros/scripts/health-check.sh" ]]; then
+        bash "$REPO/autoboros/scripts/health-check.sh"
+    else
+        say "Quick health check"; cmd_status; echo
+        systemctl --failed --no-legend 2>/dev/null | grep -q . \
+            && { bad "failed units:"; systemctl --failed --no-legend; } \
+            || ok "no failed systemd units"
+    fi
+}
+
+cmd_update() {
+    say "Updating system packages"
+    sudo apt update && sudo apt full-upgrade -y && sudo apt autoremove -y
+    if [[ -n "$REPO" && -f "$REPO/autoboros/scripts/update-check.sh" ]]; then
+        confirm "Also run app-stack update check?" && bash "$REPO/autoboros/scripts/update-check.sh"
+    fi
+    command -v needrestart &>/dev/null && sudo needrestart -r l || true
+}
+
+cmd_monitor() { local t; for t in btop htop top; do command -v "$t" &>/dev/null && exec "$t"; done; }
+
+cmd_widgets() {
+    local items=() t
+    command -v btop       &>/dev/null && items+=("btop        · system monitor")
+    command -v duf        &>/dev/null && items+=("duf         · disk usage")
+    command -v dust       &>/dev/null && items+=("dust        · directory sizes")
+    command -v lazydocker &>/dev/null && items+=("lazydocker  · container manager")
+    command -v lnav       &>/dev/null && items+=("lnav        · smart log viewer")
+    command -v yazi       &>/dev/null && items+=("yazi        · file manager")
+    ((${#items[@]})) || { warn "No TUI widgets installed yet — run: srv tools"; return; }
+    t="$(pick "Open a widget:" "${items[@]}")" || return
+    exec "${t%% *}"
+}
+
+cmd_tools() {
+    say "Installing the open-source QoL toolkit"
+    sudo apt update
+    sudo apt install -y btop duf fzf ripgrep bat fd-find zoxide tldr lnav 2>/dev/null || true
+    sudo apt install -y dust 2>/dev/null || warn "dust not in apt — skip (cargo install du-dust)"
+    if ! command -v gum &>/dev/null; then
+        confirm "Install gum (pretty menus + fuzzy filter — Charm apt repo)?" && {
+            sudo mkdir -p /etc/apt/keyrings
+            curl -fsSL https://repo.charm.sh/apt/gpg.key | sudo gpg --dearmor -o /etc/apt/keyrings/charm.gpg
+            echo "deb [signed-by=/etc/apt/keyrings/charm.gpg] https://repo.charm.sh/apt/ * *" \
+                | sudo tee /etc/apt/sources.list.d/charm.list >/dev/null
+            sudo apt update && sudo apt install -y gum
+        }
+    fi
+    ok "done — try: srv widgets"
+}
+
+cmd_stage0() { need_repo || return 1; sudo bash "$REPO/scripts/00-enable-remote-access.sh"; }
+
+cmd_harden() {
+    need_repo || return 1
+    warn "Review flags first: nano $REPO/scripts/debian-server-postinstall.sh"
+    confirm "Run the hardening script now?" && sudo bash "$REPO/scripts/debian-server-postinstall.sh"
+}
+
+cmd_apps() {
+    need_repo || return 1
+    local a; a="$(pick "App stack (autoboros):" \
+        "install     · base installer (Docker, Tailscale, tuning)" \
+        "deploy      · deploy apps by tier" \
+        "health      · app-stack health check" \
+        "core up     · start Tier 0 core (docker compose)" \
+        "back")" || return
+    case "${a%% *}" in
+        install) bash "$REPO/autoboros/install.sh" ;;
+        deploy)  local t; t="$(pick "Which tier?" tier1 tier2 all)" || return
+                 bash "$REPO/autoboros/scripts/setup-all-apps.sh" "$t" ;;
+        health)  bash "$REPO/autoboros/scripts/health-check.sh" ;;
+        core)    (cd "$HOME/docker" 2>/dev/null || cd "$REPO/autoboros"; docker compose up -d) ;;
+    esac
+}
+
+cmd_backup() {
+    need_repo || return 1
+    [[ -f "$REPO/autoboros/backup.sh" ]] && bash "$REPO/autoboros/backup.sh" \
+        || warn "no backup script found (autoboros/backup.sh)"
+}
+
+cmd_tailscale() {
+    command -v tailscale &>/dev/null || {
+        confirm "Tailscale not installed. Install it now?" || return
+        curl -fsSL https://tailscale.com/install.sh | sh; }
+    if tailscale ip -4 &>/dev/null; then tailscale status
+    else say "Bringing Tailscale up (a login URL will be printed)…"; sudo tailscale up; fi
+}
+
+cmd_logs() {
+    if command -v lnav &>/dev/null && confirm "Open in lnav (smart viewer)?"; then
+        sudo lnav /var/log/syslog 2>/dev/null || sudo journalctl | lnav
+    else
+        sudo journalctl -f -n 50
+    fi
+}
+
+# ------------------------------------------------------------------ hosts
+hosts_list() { [[ -f "$HOSTS_FILE" ]] && grep -vE '^\s*(#|$)' "$HOSTS_FILE" || true; }
+
+cmd_hosts() {
+    local a; a="$(pick "Saved hosts:" "list" "add" "edit" "back")" || return
+    case "$a" in
+        list) hosts_list | awk '{printf "  %-10s %s\n", $1, $2}'
+              [[ -s "$HOSTS_FILE" ]] || warn "none yet — srv hosts → add" ;;
+        add)  local n t
+              n="$(input "Short name (e.g. tower, vps1):" "tower")"
+              t="$(input "SSH target (user@address):" "user@192.168.1.75")"
+              [[ -n "$n" && -n "$t" ]] && { echo "$n $t" >> "$HOSTS_FILE"; ok "saved: $n → $t"; } ;;
+        edit) "${EDITOR:-nano}" "$HOSTS_FILE" ;;
+    esac
+}
+
+cmd_connect() {
+    local want="${1:-}" line
+    if [[ -n "$want" ]]; then
+        line="$(hosts_list | awk -v w="$want" 'tolower($1) ~ "^"tolower(w) {print; exit}')"
+    fi
+    if [[ -z "${line:-}" ]]; then
+        local names; mapfile -t names < <(hosts_list | awk '{print $1"  ·  "$2}')
+        ((${#names[@]})) || { warn "no saved hosts — run: srv hosts → add"; return 1; }
+        line="$(pick "Connect to:" "${names[@]}")" || return
+        line="${line//  ·  / }"
+    fi
+    say "→ ssh $(echo "$line" | awk '{print $2}') (${line%% *})"
+    exec ssh "$(echo "$line" | awk '{print $2}')"
+}
+
+cmd_help() { sed -n '3,34p' "$0" | sed 's/^# \{0,1\}//'; }
+
+# ------------------------------------------------------------------ menu
+menu_items() {
+    # recent commands first (memory), then the rest in registry order
+    local -A seen=()
+    local r entry name short syns desc
+    for r in $(recent_cmds 3); do
+        for entry in "${COMMANDS[@]}"; do
+            IFS='|' read -r name short syns desc <<< "$entry"
+            [[ "$name" == "$r" ]] && { printf '★ %-11s· %s\n' "$name" "$desc"; seen[$name]=1; }
+        done
+    done
+    for entry in "${COMMANDS[@]}"; do
+        IFS='|' read -r name short syns desc <<< "$entry"
+        [[ "$name" == "help" || -n "${seen[$name]:-}" ]] && continue
+        printf '  %-11s· %s\n' "$name" "$desc"
+    done
+    echo "  quit"
+}
+
+cmd_menu() {
+    cmd_status; echo
+    local items; mapfile -t items < <(menu_items)
+    local a; a="$(pick "srv — type to filter, enter to run:" "${items[@]}")" || return
+    a="$(echo "$a" | sed 's/^[★ ]*//; s/ .*//')"
+    [[ "$a" == "quit" ]] && return
+    run_cmd "$a"; echo
+    confirm "Back to menu?" && cmd_menu
+}
+
+# ------------------------------------------------------------------ dispatch
+run_cmd() {
+    local name="$1"; shift 2>/dev/null || true
+    remember "$name"
+    case "$name" in
+        status)    cmd_status ;;
+        health)    cmd_health ;;
+        update)    cmd_update ;;
+        monitor)   cmd_monitor ;;
+        widgets)   cmd_widgets ;;
+        tools)     cmd_tools ;;
+        stage0)    cmd_stage0 ;;
+        harden)    cmd_harden ;;
+        apps)      cmd_apps ;;
+        backup)    cmd_backup ;;
+        tailscale) cmd_tailscale ;;
+        logs)      cmd_logs ;;
+        connect)   cmd_connect "${1:-}" ;;
+        hosts)     cmd_hosts ;;
+        help)      cmd_help ;;
+    esac
+}
+
+main() {
+    local raw="${1:-}"; shift 2>/dev/null || true
+    [[ -z "$raw" ]] && { cmd_menu; return; }
+    local m; m="$(resolve "$raw")"
+    case "$m" in
+        "")            bad "unknown: $raw"
+                       echo "  try: srv help   — or just: srv  (menu with fuzzy filter)"
+                       return 1 ;;
+        __host__)      remember "connect"; cmd_connect "$raw" ;;
+        __suggest__:*) local sug="${m#__suggest__:}"
+                       if confirm "Did you mean: srv ${C_BOLD}$sug${C_RESET}?"; then run_cmd "$sug" "$@"
+                       else bad "cancelled — try: srv help"; return 1; fi ;;
+        *)             run_cmd "$m" "$@" ;;
+    esac
+}
+
+main "$@"
