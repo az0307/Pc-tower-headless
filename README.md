@@ -41,12 +41,31 @@ self-hosted homelab on 15-year-old hardware.
 
 ## Quick Start
 
-### Layer 1 — base server
+### Stage 0 — go headless first (recommended)
+
+At the tower with the monitor still attached, get remote SSH working and verified
+*before* hardening, so you can unplug the monitor and finish everything over SSH:
 
 ```bash
-# On a fresh minimal Debian 12 (Bookworm) or 13 (Trixie) install:
+sudo apt update && sudo apt install -y git
 git clone <this-repo-url> debian12-headless-server
 cd debian12-headless-server
+sudo bash scripts/00-enable-remote-access.sh
+```
+
+It enables password SSH, sets your password, runs checks, and prints the exact
+`ssh user@<ip>` command. Once that works from your laptop, unplug the monitor. Full
+walkthrough: [`docs/00-remote-access-bootstrap.md`](docs/00-remote-access-bootstrap.md).
+
+### Layer 1 — base server + hardening
+
+From your laptop over SSH (or at the console):
+
+```bash
+cd debian12-headless-server
+
+# install your key first so hardening can safely switch to key-only:
+#   (run ON your laptop)  ssh-copy-id youruser@<tower-ip>
 
 # Review and set the flags at the top of the script
 nano scripts/debian-server-postinstall.sh
@@ -57,7 +76,9 @@ sudo bash scripts/debian-server-postinstall.sh
 
 The script auto-detects Bookworm vs Trixie and is configured entirely by flags at the
 top (hardening is always on; Docker, QoL tools, `aichat`, Cockpit, legacy-hardware
-tweaks, and minimal mode are opt-in).
+tweaks, and minimal mode are opt-in). It has a **lockout guard**: it only disables
+password SSH once it detects your installed key, so a remote run can't lock you out
+(override with `FORCE_KEY_ONLY=true`).
 
 ### Layer 2 — old tower + remote access
 
@@ -93,8 +114,10 @@ debian12-headless-server/
 ├── CHANGELOG.md                       # what was consolidated, and why
 ├── LICENSE                            # MIT
 ├── scripts/
+│   ├── 00-enable-remote-access.sh     # Stage 0: enable + verify password SSH so you can go headless
 │   └── debian-server-postinstall.sh   # canonical base hardening + QoL script (Bookworm/Trixie)
 ├── docs/
+│   ├── 00-remote-access-bootstrap.md  # go-headless-first workflow (Stage 0)
 │   ├── 01-installation-guide.md       # minimal headless install + hardening walkthrough
 │   ├── 02-meta-best-practices.md      # long-term philosophy, evolution path
 │   ├── 03-community-favorites.md      # most-loved 2026 tools (Netdata, restic, Caddy, …)

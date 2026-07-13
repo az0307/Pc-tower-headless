@@ -20,6 +20,7 @@ INSTALL_QOL_TOOLS=true           # Modern CLI + TUI tools (atuin, yazi, lazygit,
 INSTALL_AICHAT=true              # AI assistant in terminal (supports Gemini)
 LEGACY_HARDWARE=false            # Add tweaks for old CPUs (Vista era / Core 2 era)
 MINIMAL_MODE=false               # Aggressive minimalism for low-RAM/old hardware (disables most QoL)
+FORCE_KEY_ONLY=false             # true = disable SSH passwords even if no key is found (lockout risk!)
 # ===================================================================
 
 # --- Root check ---
@@ -109,6 +110,33 @@ timedatectl set-ntp true
 # 7. Harden SSH
 echo "[7] Hardening SSH..."
 cp /etc/ssh/sshd_config "/etc/ssh/sshd_config.bak.$(date +%F_%T)" 2>/dev/null || true
+# Remove any Stage 0 temporary drop-in; this hardened config takes over fully.
+rm -f /etc/ssh/sshd_config.d/00-remote-access.conf 2>/dev/null || true
+
+# Lockout guard: only disable password auth if the login user actually has an
+# SSH key installed — otherwise a remote run of this script would lock you out.
+KEY_TARGET_USER="${ADMIN_USER:-${SUDO_USER:-}}"
+PASSWORD_AUTH="no"
+KBD_AUTH="no"
+if [[ "$FORCE_KEY_ONLY" != "true" ]]; then
+    _authkeys=""
+    if [[ -n "$KEY_TARGET_USER" ]] && id "$KEY_TARGET_USER" &>/dev/null; then
+        _home="$(getent passwd "$KEY_TARGET_USER" | cut -d: -f6)"
+        _authkeys="$_home/.ssh/authorized_keys"
+    fi
+    if [[ -z "$_authkeys" || ! -s "$_authkeys" ]]; then
+        echo ">>> WARNING: no SSH key found for '${KEY_TARGET_USER:-<unknown user>}'."
+        echo "    Keeping PASSWORD login ENABLED so you are not locked out remotely."
+        echo "    Install a key first:  ssh-copy-id ${KEY_TARGET_USER:-youruser}@<host>"
+        echo "    then re-run with FORCE_KEY_ONLY=true to switch to key-only."
+        PASSWORD_AUTH="yes"
+        KBD_AUTH="yes"
+    else
+        echo ">>> SSH key found for '$KEY_TARGET_USER' → disabling password login (key-only)."
+    fi
+else
+    echo ">>> FORCE_KEY_ONLY=true → disabling password login regardless of key presence."
+fi
 
 cat > /etc/ssh/sshd_config << EOF
 # Debian ${CODENAME^} Hardened SSH Config (generated $(date +%F))
@@ -119,8 +147,8 @@ ListenAddress ::
 
 PermitRootLogin no
 PubkeyAuthentication yes
-PasswordAuthentication no
-KbdInteractiveAuthentication no
+PasswordAuthentication $PASSWORD_AUTH
+KbdInteractiveAuthentication $KBD_AUTH
 UsePAM yes
 
 AllowTcpForwarding no
@@ -145,8 +173,14 @@ sshd -t
 systemctl restart ssh
 systemctl enable ssh
 
-echo ">>> SSH is now key-only. Run from your workstation:"
-echo "    ssh-copy-id -p $SSH_PORT youruser@$NEW_HOSTNAME"
+if [[ "$PASSWORD_AUTH" == "no" ]]; then
+    echo ">>> SSH is now key-only. Run from your workstation:"
+    echo "    ssh-copy-id -p $SSH_PORT youruser@$NEW_HOSTNAME"
+else
+    echo ">>> SSH still allows PASSWORD login (no key was found)."
+    echo "    Install your key, then re-run with FORCE_KEY_ONLY=true to lock it down:"
+    echo "    ssh-copy-id -p $SSH_PORT ${KEY_TARGET_USER:-youruser}@$NEW_HOSTNAME"
+fi
 
 # 8. Firewall (UFW) - safer handling
 echo "[8] Configuring UFW firewall..."

@@ -1,5 +1,31 @@
 # Changelog
 
+## Stage 0 remote-access bootstrap + lockout guard
+
+Adds a gentle "go headless first" onboarding path so you can set up remote SSH at
+the tower, verify it from your laptop, unplug the monitor, and finish the rest
+remotely — without risking a lockout.
+
+### Added
+
+- `scripts/00-enable-remote-access.sh` — Stage 0 bootstrap: installs/enables the SSH
+  server, sets the login user's password, turns on **password** auth via a clean
+  drop-in, opens the firewall only if UFW is already active, runs connectivity checks
+  (sshd active, port listening, user exists, default route), and prints the exact
+  `ssh user@<ip>` command to use. Idempotent.
+- `docs/00-remote-access-bootstrap.md` — the go-headless-first workflow end to end.
+
+### Changed
+
+- `scripts/debian-server-postinstall.sh` — added a **lockout guard**: password login
+  is now disabled only when the login user has an installed SSH key (else it stays on
+  with a warning), so running the hardener remotely can't lock you out. New
+  `FORCE_KEY_ONLY` flag overrides the guard. The hardener also removes the Stage 0
+  drop-in when it takes over, and its final message reflects whether password auth
+  was kept.
+- `README.md` — documented Stage 0 and the recommended order (Stage 0 → key →
+  hardening).
+
 ## Consolidation — initial repo
 
 This repository was assembled by consolidating four separate uploads into one
