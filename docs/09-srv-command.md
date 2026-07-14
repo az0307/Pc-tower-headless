@@ -68,7 +68,7 @@ Hosts live in `~/.config/srv/hosts` (one `name user@address` per line).
 | `~/.config/srv/hosts` | saved SSH hosts |
 | `~/.config/srv/history` | usage memory for the ★ recent section |
 
-The repo path is auto-detected (`~/meta-automation-hub/debian12-headless-server` and
+The repo path is auto-detected (`~/Pc-tower-headless`, `~/debian12-headless-server`, and
 friends); override with `export SRV_REPO=/path/to/debian12-headless-server`.
 
 ### zsh completion

@@ -43,8 +43,8 @@ console and get the repo onto the machine, then run Stage 0:
 ```bash
 # get the code (needs the network up — Ethernet recommended)
 sudo apt update && sudo apt install -y git
-git clone https://github.com/az0307/meta-automation-hub.git
-cd meta-automation-hub/debian12-headless-server
+git clone https://github.com/az0307/Pc-tower-headless.git
+cd Pc-tower-headless
 
 # enable + verify remote SSH
 sudo bash scripts/00-enable-remote-access.sh
@@ -97,7 +97,7 @@ Now SSH in and run the main hardening script:
 
 ```bash
 ssh youruser@192.168.1.75
-cd meta-automation-hub/debian12-headless-server
+cd Pc-tower-headless
 sudo bash scripts/debian-server-postinstall.sh
 ```
 

@@ -175,6 +175,8 @@ find_repo() {
     local c
     for c in \
         "${SRV_REPO:-}" \
+        "$HOME/Pc-tower-headless" \
+        "$HOME/pc-tower-headless" \
         "$HOME/meta-automation-hub/debian12-headless-server" \
         "$HOME/debian12-headless-server" \
         "$(dirname "$(dirname "$(readlink -f "$0")")")"; do
@@ -188,8 +190,8 @@ REPO="$(find_repo || true)"
 need_repo() {
     [[ -n "$REPO" ]] && return 0
     bad "Toolkit repo not found. Clone it, then re-run:"
-    echo "    git clone https://github.com/az0307/meta-automation-hub.git"
-    echo "    export SRV_REPO=~/meta-automation-hub/debian12-headless-server"
+    echo "    git clone https://github.com/az0307/Pc-tower-headless.git"
+    echo "    export SRV_REPO=~/Pc-tower-headless"
     return 1
 }
 
