@@ -19,7 +19,7 @@ cp "${HOME}/docker/docker-compose.yml" "${HOME}/backups/configs/" 2>/dev/null ||
 cp "${HOME}/docker/caddy/Caddyfile" "${HOME}/backups/configs/" 2>/dev/null || true
 cp -r "${HOME}/apps" "${HOME}/backups/configs/" 2>/dev/null || true
 
-restic -r "${REPO}" backup     --tag "${TAG}"     --exclude-file "${HOME}/.restic-exclude"     "${HOME}/docker"     "${HOME}/apps"     /etc     /var/lib/docker/volumes     "${HOME}/backups/configs"
+restic -r "${REPO}" backup     --password-file "$PASS_FILE"     --tag "${TAG}"     --exclude-file "${HOME}/.restic-exclude"     "${HOME}/docker"     "${HOME}/apps"     /etc     /var/lib/docker/volumes     "${HOME}/backups/configs"
 
 restic -r "${REPO}" forget --tag "autoboros" --keep-last 8 --prune --password-file "$PASS_FILE"
 

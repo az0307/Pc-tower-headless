@@ -1,4 +1,3 @@
-version: "3.9"
 # Pocket ID Passkey Auth — Tier 1
 # RAM: 128MB | CPU: 0.2
 # OIDC provider, passwordless, Go backend

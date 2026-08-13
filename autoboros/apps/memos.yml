@@ -1,4 +1,3 @@
-version: "3.9"
 # Memos Quick Notes — Tier 1
 # RAM: 64MB | CPU: 0.2
 # Single Go binary, SQLite default, ~20MB image
