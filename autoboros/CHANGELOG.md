@@ -1,5 +1,21 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+- `backup.sh`: the `restic backup` call now passes `--password-file`, matching the
+  `init`/`forget` calls. Without it the command fell back to an interactive password
+  prompt and would hang/fail under an unattended (cron) run.
+
+### Changed
+- `apps/n8n.yml`: removed the `N8N_BASIC_AUTH_*` variables. n8n removed basic auth in
+  v1.0; on the pinned 1.82.0 image they were silently ignored. Access is now documented
+  as being protected by n8n's built-in owner account (created on first UI visit).
+- `apps/vaultwarden.yml`: documented that `ADMIN_TOKEN` should be an Argon2id PHC hash
+  (via `vaultwarden hash`) rather than a plaintext value.
+- Removed the obsolete top-level `version:` key from all Compose files (`docker-compose.yml`
+  and `apps/*.yml`); Docker Compose warns on it and always uses the latest schema.
+
 ## [3.0.0] - 2026-07-06
 
 ### Added

@@ -1,4 +1,3 @@
-version: "3.9"
 # n8n Automation — Tier 3 (Worker Only)
 # RAM: 512MB | CPU: 1.0
 # Deploy on laptop/worker, NOT on tower
@@ -9,9 +8,9 @@ services:
     mem_limit: 512m
     cpus: 1.0
     environment:
-      N8N_BASIC_AUTH_ACTIVE: "true"
-      N8N_BASIC_AUTH_USER: "${N8N_USER:-admin}"
-      N8N_BASIC_AUTH_PASSWORD: "${N8N_PASSWORD:-changeme}"
+      # NOTE: n8n removed basic auth / JWT in v1.0. Access is now protected by
+      # n8n's built-in owner account, created on first visit to the web UI.
+      # Set a strong owner password there, and keep this behind Tailscale.
       N8N_HOST: "n8n.${TAILSCALE_DOMAIN}"
       N8N_PORT: "5678"
       WEBHOOK_URL: "https://n8n.${TAILSCALE_DOMAIN}"

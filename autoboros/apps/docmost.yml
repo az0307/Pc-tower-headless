@@ -1,4 +1,3 @@
-version: "3.9"
 # Docmost Wiki — Tier 3 (Worker Only)
 # RAM: 512MB | CPU: 0.5
 # Confluence alternative, collaborative editing, CRDT sync

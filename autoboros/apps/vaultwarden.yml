@@ -1,4 +1,3 @@
-version: "3.9"
 # Vaultwarden Password Vault — Tier 1
 # RAM: 192MB | CPU: 0.3
 services:
@@ -10,6 +9,10 @@ services:
     environment:
       WEBSOCKET_ENABLED: "true"
       SIGNUPS_ALLOWED: "false"
+      # Set VAULTWARDEN_ADMIN_TOKEN to an Argon2id PHC hash, not a plaintext
+      # secret. Generate one with:  docker run --rm -it vaultwarden/server /vaultwarden hash
+      # Store it in the env file. If it contains literal '$' and you inline it in
+      # a compose file instead, escape each '$' as '$$'. Leave unset to disable /admin.
       ADMIN_TOKEN: "${VAULTWARDEN_ADMIN_TOKEN:-}"
       WEB_VAULT_ENABLED: "true"
       ROCKET_WORKERS: "4"
