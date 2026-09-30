@@ -19,7 +19,7 @@ echo "Removing packages..."
 sudo apt-get remove -y zram-tools earlyoom fail2ban unattended-upgrades 2>/dev/null || true
 
 echo "Restoring .bashrc..."
-LATEST=$(ls -t ~/.bashrc.autoboros-backup.* 2>/dev/null | head -n1)
+LATEST=$(ls -t ~/.bashrc.autoboros-backup.* 2>/dev/null | head -n1 || true)
 [[ -n "$LATEST" ]] && cp "$LATEST" ~/.bashrc
 
 sudo rm -f /etc/update-motd.d/10-autoboros /etc/sysctl.d/99-autoboros-performance.conf

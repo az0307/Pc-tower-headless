@@ -41,7 +41,8 @@ fi
 # -- Phase 1: GRUB ---------------------------------------------
 echo ""
 echo "=== [1/9] GRUB Kernel Parameters ==="
-sudo sed -i "s/GRUB_CMDLINE_LINUX_DEFAULT=.*/GRUB_CMDLINE_LINUX_DEFAULT="$GRUB"/" /etc/default/grub
+sudo cp -n /etc/default/grub /etc/default/grub.autoboros-orig
+sudo sed -i "s|^GRUB_CMDLINE_LINUX_DEFAULT=.*|GRUB_CMDLINE_LINUX_DEFAULT=\"${GRUB}\"|" /etc/default/grub
 sudo update-grub
 echo "  Updated. Reboot required."
 
@@ -137,7 +138,7 @@ sudo systemctl restart zramswap
 
 if ! swapon --show=NAME | grep -q swap; then
     [[ ${RAM_MB%.*} -le 2048 ]] && SWAP_SIZE="1G" || SWAP_SIZE="512M"
-    sudo fallocate -l "$SWAP_SIZE" /swapfile 2>/dev/null || sudo dd if=/dev/zero of=/swapfile bs=1M count=$(echo "$SWAP_SIZE" | sed 's/G/*1024/' | sed 's/M//') 2>/dev/null
+    sudo fallocate -l "$SWAP_SIZE" /swapfile 2>/dev/null || sudo dd if=/dev/zero of=/swapfile bs=1M count=$(( ${SWAP_SIZE%[GM]} * $([[ $SWAP_SIZE == *G ]] && echo 1024 || echo 1) )) 2>/dev/null
     sudo chmod 600 /swapfile && sudo mkswap /swapfile && sudo swapon /swapfile
     grep -q /swapfile /etc/fstab || echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
     echo "  Swapfile: $SWAP_SIZE"
@@ -146,6 +147,7 @@ fi
 # -- Phase 7: Docker Tuning ------------------------------------
 echo ""
 echo "=== [7/9] Docker Tuning ==="
+[ -f /etc/docker/daemon.json ] && sudo cp -a /etc/docker/daemon.json "/etc/docker/daemon.json.$(date +%Y%m%d%H%M%S).bak"
 sudo tee /etc/docker/daemon.json > /dev/null <<'DOCKEREEOF'
 {
   "log-driver": "json-file",
@@ -159,7 +161,7 @@ sudo tee /etc/docker/daemon.json > /dev/null <<'DOCKEREEOF'
 }
 DOCKEREEOF
 sudo systemctl restart docker
-sudo docker system prune -af --volumes 2>/dev/null || true
+sudo docker image prune -f 2>/dev/null || true
 
 # -- Phase 8: Logrotate + Cron ---------------------------------
 echo ""

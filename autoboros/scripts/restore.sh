@@ -14,7 +14,10 @@ restic -r "$REPO" snapshots --password-file "$PASS_FILE"
 read -p "Restore snapshot $SNAPSHOT? [y/N] " -n 1 -r; echo
 [[ $REPLY =~ ^[Yy]$ ]] || exit 0
 
-mkdir -p /tmp/autoboros-restore
-restic -r "$REPO" restore "$SNAPSHOT" --target /tmp/autoboros-restore --password-file "$PASS_FILE"
+# Restored data may include /etc secrets: keep it out of world-readable /tmp.
+RESTORE_DIR="${RESTORE_DIR:-${HOME}/autoboros-restore}"
+mkdir -p "$RESTORE_DIR"
+chmod 700 "$RESTORE_DIR"
+restic -r "$REPO" restore "$SNAPSHOT" --target "$RESTORE_DIR" --password-file "$PASS_FILE"
 
-echo "Restore complete. Review /tmp/autoboros-restore/ and copy manually."
+echo "Restore complete. Review ${RESTORE_DIR}/ and copy manually."
