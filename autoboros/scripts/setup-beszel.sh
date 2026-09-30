@@ -20,7 +20,8 @@ if [[ "$MODE" == "agent-only" ]] || [[ "$MODE" == "full" ]]; then
     echo "  Installing Beszel Agent..."
 
     # Get hub key from user
-    read -p "Enter Beszel Hub public key: " HUB_KEY
+    read -r -p "Enter Beszel Hub public key: " HUB_KEY
+    [[ -n "$HUB_KEY" ]] || { echo "FATAL: empty hub key"; exit 1; }
 
     docker run -d         --name beszel-agent         --restart unless-stopped         --network host         -v /var/run/docker.sock:/var/run/docker.sock:ro         -e KEY="$HUB_KEY"         -e PORT=45876         --memory=32m         --cpus=0.1         henrygd/beszel-agent:0.18.7
 

@@ -9,10 +9,10 @@ check() {
     local cmd="$2"
     if eval "$cmd" > /dev/null 2>&1; then
         echo "  [PASS] $name"
-        ((PASS++))
+        PASS=$((PASS+1))
     else
         echo "  [FAIL] $name"
-        ((FAIL++))
+        FAIL=$((FAIL+1))
     fi
 }
 
@@ -40,11 +40,11 @@ echo ""
 echo "--- Resources ---"
 RAM_USED=$(free | awk '/^Mem:/ {printf "%.0f", $3/$2 * 100}')
 echo "  RAM usage: ${RAM_USED}%"
-[[ $RAM_USED -lt 90 ]] && { echo "  [PASS] RAM usage"; ((PASS++)); } || { echo "  [FAIL] RAM usage >90%"; ((FAIL++)); }
+[[ $RAM_USED -lt 90 ]] && { echo "  [PASS] RAM usage"; PASS=$((PASS+1)); } || { echo "  [FAIL] RAM usage >90%"; FAIL=$((FAIL+1)); }
 
 DISK_USED=$(df / | awk 'NR==2 {gsub(/%/,""); print $5}')
 echo "  Disk usage: ${DISK_USED}%"
-[[ $DISK_USED -lt 90 ]] && { echo "  [PASS] Disk usage"; ((PASS++)); } || { echo "  [FAIL] Disk usage >90%"; ((FAIL++)); }
+[[ $DISK_USED -lt 90 ]] && { echo "  [PASS] Disk usage"; PASS=$((PASS+1)); } || { echo "  [FAIL] Disk usage >90%"; FAIL=$((FAIL+1)); }
 
 echo ""
 echo "=== Results: $PASS passed, $FAIL failed ==="

@@ -41,7 +41,8 @@ fi
 # -- Phase 1: GRUB ---------------------------------------------
 echo ""
 echo "=== [1/9] GRUB Kernel Parameters ==="
-sudo sed -i "s/GRUB_CMDLINE_LINUX_DEFAULT=.*/GRUB_CMDLINE_LINUX_DEFAULT="$GRUB"/" /etc/default/grub
+sudo cp -n /etc/default/grub /etc/default/grub.autoboros-orig
+sudo sed -i "s|^GRUB_CMDLINE_LINUX_DEFAULT=.*|GRUB_CMDLINE_LINUX_DEFAULT=\"${GRUB}\"|" /etc/default/grub
 sudo update-grub
 echo "  Updated. Reboot required."
 
